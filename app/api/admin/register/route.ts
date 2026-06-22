@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     password,
     options: {
       data: {
-        role: 'admin',
+        role: 'adminglobal',
       },
     },
   })
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     const { error: updateError } = await adminSupabase.auth.admin.updateUserById(existing.id, {
-      user_metadata: { ...existing.user_metadata, role: 'admin' },
+      user_metadata: { ...existing.user_metadata, role: 'adminglobal' },
       email_confirm: true,
     })
 

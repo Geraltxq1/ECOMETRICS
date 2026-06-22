@@ -14,12 +14,16 @@ CREATE TABLE IF NOT EXISTS empresas (
   pais       TEXT DEFAULT 'Colombia',
   sector     TEXT,
   user_id    UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  notificar_revision BOOLEAN DEFAULT TRUE,
+  notificar_rechazo  BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 ALTER TABLE empresas ADD COLUMN IF NOT EXISTS industria TEXT;
 ALTER TABLE empresas ADD COLUMN IF NOT EXISTS sector    TEXT;
+ALTER TABLE empresas ADD COLUMN IF NOT EXISTS notificar_revision BOOLEAN DEFAULT TRUE;
+ALTER TABLE empresas ADD COLUMN IF NOT EXISTS notificar_rechazo  BOOLEAN DEFAULT TRUE;
 
 -- ────────────────────────────────────────────────
 -- 2. PERFILES (extiende auth.users)
@@ -137,11 +141,18 @@ CREATE TABLE IF NOT EXISTS registros_datos (
   co2_calculado  NUMERIC,
   anio           INTEGER NOT NULL,
   mes            INTEGER CHECK (mes BETWEEN 1 AND 12),
-  estado         TEXT CHECK (estado IN ('borrador','en_revision','aprobado','rechazado')) DEFAULT 'borrador',
+  estado         TEXT CHECK (estado IN ('borrador','en_revision','aprobado','rechazado','publicado')) DEFAULT 'borrador',
+  publicado_en   TIMESTAMPTZ,
+  revisado_por   UUID REFERENCES auth.users(id),
+  revisado_en    TIMESTAMPTZ,
   notas          TEXT,
   created_at     TIMESTAMPTZ DEFAULT NOW(),
   updated_at     TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE registros_datos ADD COLUMN IF NOT EXISTS publicado_en TIMESTAMPTZ;
+ALTER TABLE registros_datos ADD COLUMN IF NOT EXISTS revisado_por UUID REFERENCES auth.users(id);
+ALTER TABLE registros_datos ADD COLUMN IF NOT EXISTS revisado_en TIMESTAMPTZ;
 
 -- Compatibilidad: si columna vieja existe, renombrar
 DO $$
@@ -155,7 +166,33 @@ BEGIN
 END $$;
 
 -- ────────────────────────────────────────────────
--- 9. EVIDENCIAS
+-- 9. COMENTARIOS DE REVISIÓN
+-- ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS comentarios_revision (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  registro_id UUID REFERENCES registros_datos(id) ON DELETE CASCADE,
+  usuario_id  UUID REFERENCES auth.users(id),
+  comentario  TEXT NOT NULL,
+  accion      TEXT CHECK (accion IN ('aprobado','rechazado')) NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ────────────────────────────────────────────────
+-- 10. NOTIFICACIONES
+-- ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS notificaciones (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id  UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  empresa_id  UUID REFERENCES empresas(id),
+  tipo        TEXT NOT NULL,
+  mensaje     TEXT NOT NULL,
+  leida       BOOLEAN DEFAULT FALSE,
+  registro_id UUID REFERENCES registros_datos(id),
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ────────────────────────────────────────────────
+-- 11. EVIDENCIAS
 -- ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS evidencias (
   id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,

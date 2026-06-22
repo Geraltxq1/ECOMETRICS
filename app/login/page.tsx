@@ -41,7 +41,8 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/dashboard')
+      const role = (data.user.user_metadata as { role?: string })?.role
+      router.push(role === 'adminglobal' ? '/admin/dashboard' : '/dashboard')
       router.refresh()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)

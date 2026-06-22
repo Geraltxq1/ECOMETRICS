@@ -33,10 +33,10 @@ export default function AdminDashboardClient({ currentUser, users, empresas }: P
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/admin')
+    router.push('/login')
   }
 
-  const adminCount = users.filter(u => u.user_metadata?.role === 'admin').length
+  const adminCount = users.filter(u => u.user_metadata?.role === 'adminglobal').length
   const userCount = users.length - adminCount
 
   const navItems: { id: Tab; label: string; icon: string }[] = [
@@ -223,7 +223,11 @@ function StatCard({
 }
 
 function RoleBadge({ role }: { role?: string }) {
-  const isAdmin = role === 'admin'
+  const cfg =
+    role === 'adminglobal' ? { label: 'Admin Global', bg: '#faf5ff', color: '#7c3aed', border: '#ddd6fe' } :
+    role === 'admin'       ? { label: 'Admin',        bg: '#f0fdfa', color: '#0f766e', border: '#99f6e4' } :
+    role === 'editor'      ? { label: 'Editor',       bg: '#fffbeb', color: '#b45309', border: '#fde68a' } :
+                             { label: 'Viewer',        bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' }
   return (
     <span style={{
       display: 'inline-block',
@@ -231,11 +235,11 @@ function RoleBadge({ role }: { role?: string }) {
       borderRadius: 999,
       fontSize: 12,
       fontWeight: 600,
-      background: isAdmin ? '#f0fdfa' : '#f8fafc',
-      color: isAdmin ? '#0f766e' : '#64748b',
-      border: `1px solid ${isAdmin ? '#99f6e4' : '#e2e8f0'}`,
+      background: cfg.bg,
+      color: cfg.color,
+      border: `1px solid ${cfg.border}`,
     }}>
-      {isAdmin ? 'Admin' : 'Usuario'}
+      {cfg.label}
     </span>
   )
 }

@@ -86,7 +86,7 @@ export default function AdminRegisterPage() {
         </form>
 
         <p style={styles.footer}>
-          ¿Ya tienes cuenta admin? <Link href="/admin" style={styles.link}>Inicia sesión</Link>
+          ¿Ya tienes cuenta admin? <Link href="/login" style={styles.link}>Inicia sesión</Link>
         </p>
       </div>
     </div>

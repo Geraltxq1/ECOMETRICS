@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabaseClient'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
+import { TrendingUpIcon } from '@/components/Icons'
+import BannerInfo from '@/components/BannerInfo'
 
 interface Indicador {
   id: string
@@ -77,6 +79,13 @@ export default function IndicadoresPage() {
                 </p>
               </div>
 
+              <BannerInfo tipo="info">
+                Mostrando 12 de 400+ indicadores GRI disponibles. ECØMETRICS prioriza los indicadores de
+                mayor impacto para pymes en fase inicial de gestión de sostenibilidad. El catálogo está
+                diseñado para escalar sin cambios de arquitectura — agregar nuevos indicadores es una
+                inserción en base de datos, no una reescritura del sistema.
+              </BannerInfo>
+
               {/* Filtros */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
                 {categorias.map(cat => (
@@ -96,7 +105,7 @@ export default function IndicadoresPage() {
 
               {filtrados.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '60px 24px', color: '#94a3b8' }}>
-                  <div style={{ fontSize: 44, marginBottom: 12 }}>📈</div>
+                  <div style={{ marginBottom: 12 }}><TrendingUpIcon size={44} color="#cbd5e1" /></div>
                   <p style={{ margin: 0, fontSize: 14 }}>Sin indicadores en esta categoría.</p>
                   <p style={{ margin: '6px 0 0', fontSize: 12 }}>Ejecuta sql/schema.sql en Supabase para cargar los 12 indicadores GRI.</p>
                 </div>

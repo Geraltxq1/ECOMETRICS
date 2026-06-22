@@ -1,9 +1,11 @@
+import type { ReactNode } from 'react'
+
 interface StatsCardProps {
   title: string
   value: string | number
   description?: string
   color?: string
-  icon?: string
+  icon?: ReactNode
 }
 
 export default function StatsCard({

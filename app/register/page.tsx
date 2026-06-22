@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabaseClient'
+import { MailIcon, BuildingIcon } from '@/components/Icons'
 
 function traducirError(msg: string): string {
   if (msg.includes('Password should be at least')) return 'La contraseña debe tener mínimo 6 caracteres.'
@@ -49,36 +50,19 @@ export default function RegisterPage() {
     const userId = authData.user.id
 
     if (usaCodigoInv && codigoInv.trim()) {
-      // 2a. Validar código de invitación
-      const { data: codigo, error: codErr } = await supabase
-        .from('codigos_invitacion')
-        .select('id, empresa_id, rol_asignado')
-        .eq('codigo', codigoInv.trim().toUpperCase())
-        .eq('usado', false)
-        .gt('expira_en', new Date().toISOString())
-        .single()
+      // 2a. Validar código, crear perfil y marcar usado (server-side)
+      const res = await fetch('/api/empresa/usar-codigo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, codigo: codigoInv.trim(), nombre, email }),
+      })
+      const result = await res.json()
 
-      if (codErr || !codigo) {
-        setError('Código de invitación inválido o expirado.')
+      if (!res.ok) {
+        setError(result.error ?? 'Código de invitación inválido o expirado.')
         setLoading(false)
         return
       }
-
-      // Crear perfil vinculado a empresa existente
-      await supabase.from('perfiles').insert({
-        user_id:    userId,
-        empresa_id: codigo.empresa_id,
-        nombre,
-        email,
-        rol:        codigo.rol_asignado ?? 'editor',
-        activo:     true,
-      } as never)
-
-      // Marcar código como usado
-      await supabase
-        .from('codigos_invitacion')
-        .update({ usado: true, usado_por: userId } as never)
-        .eq('id', codigo.id)
 
     } else {
       // 2b. Crear empresa nueva + perfil admin
@@ -94,14 +78,20 @@ export default function RegisterPage() {
         return
       }
 
-      await supabase.from('perfiles').insert({
+      const { error: perfilAdminErr } = await supabase.from('perfiles').insert({
         user_id:    userId,
         empresa_id: empresa.id,
         nombre,
         email,
-        rol:        'admin',
+        rol:        'admin', 
         activo:     true,
       } as never)
+
+      if (perfilAdminErr) {
+        setError('Empresa creada pero hubo un error al guardar tu perfil. Inicia sesión e intenta de nuevo.')
+        setLoading(false)
+        return
+      }
     }
 
     router.push('/dashboard')
@@ -111,7 +101,7 @@ export default function RegisterPage() {
     return (
       <div style={s.page}>
         <div style={s.card}>
-          <div style={s.successIcon}>✉</div>
+          <div style={s.successIcon}><MailIcon size={28} color="#16a34a" /></div>
           <h2 style={s.successTitle}>Confirma tu correo</h2>
           <p style={s.successText}>
             Enviamos un enlace de activación a <strong>{email}</strong>.
@@ -197,7 +187,7 @@ export default function RegisterPage() {
             {!usaCodigoInv && (
               <div style={{ padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                 <p style={{ margin: 0, fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
-                  🏢 Sin código: se creará una empresa nueva y serás el administrador.
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><BuildingIcon size={13} color="#16a34a" /> Sin código: se creará una empresa nueva y serás el administrador.</span>
                 </p>
               </div>
             )}

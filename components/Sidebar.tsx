@@ -5,15 +5,18 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabaseClient'
 import { canAdmin, canEdit } from '@/lib/permissions'
+import { LogOutIcon } from './Icons'
 
 const NAV_ALL = [
-  { href: '/dashboard',    label: 'Dashboard',       icon: '📊', roles: null },
-  { href: '/empresas',     label: 'Empresas',         icon: '🏢', roles: ['admin'] },
-  { href: '/sedes',        label: 'Sedes',            icon: '📍', roles: ['admin', 'editor'] },
-  { href: '/indicadores',  label: 'Indicadores GRI',  icon: '📈', roles: null },
-  { href: '/registros',    label: 'Registros',        icon: '📝', roles: ['admin', 'editor'] },
-  { href: '/reportes',     label: 'Reportes',         icon: '📑', roles: null },
-  { href: '/configuracion',label: 'Configuración',    icon: '⚙️', roles: ['admin'] },
+  { href: '/dashboard',       label: 'Dashboard',       icon: '◻',  roles: null,                                badge: 'none' as const },
+  { href: '/indicadores',     label: 'Indicadores',     icon: '◈',  roles: null,                                badge: 'none' as const },
+  { href: '/registros',       label: 'Registros',       icon: '◉',  roles: ['admin', 'editor', 'auditor'],      badge: 'none' as const },
+  { href: '/revision',        label: 'Revisión',        icon: '◎',  roles: ['admin', 'auditor'],                badge: 'pending' as const },
+  { href: '/notificaciones',  label: 'Notificaciones',  icon: '◬',  roles: null,                                badge: 'notif' as const },
+  { href: '/reportes',        label: 'Reportes',        icon: '◧',  roles: null,                                badge: 'none' as const },
+  { href: '/sedes',           label: 'Sedes',           icon: '◫',  roles: ['admin'],                           badge: 'none' as const },
+  { href: '/configuracion',   label: 'Configuración',   icon: '◳',  roles: ['admin'],                           badge: 'none' as const },
+  { href: '/perfil',          label: 'Mi perfil',       icon: '◐',  roles: null,                                badge: 'none' as const },
 ]
 
 interface SidebarProps {
@@ -21,18 +24,21 @@ interface SidebarProps {
   userName?: string
   empresa?: string
   rol?: string
+  pendingCount?: number
 }
 
-export default function Sidebar({ userEmail, userName, empresa, rol: rolProp }: SidebarProps) {
+export default function Sidebar({ userEmail, userName, empresa, rol: rolProp, pendingCount: pendingCountProp }: SidebarProps) {
   const pathname = usePathname()
   const router   = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
   // Estado local que se rellena desde Supabase si los props no traen el rol
-  const [rol,        setRol]        = useState(rolProp ?? '')
-  const [empresaNombre, setEmpresaNombre] = useState(empresa ?? '')
-  const [nombre,     setNombre]     = useState(userName ?? '')
-  const [email,      setEmail]      = useState(userEmail ?? '')
+  const [rol,             setRol]             = useState(rolProp ?? '')
+  const [empresaNombre,   setEmpresaNombre]   = useState(empresa ?? '')
+  const [nombre,          setNombre]          = useState(userName ?? '')
+  const [email,           setEmail]           = useState(userEmail ?? '')
+  const [pendingCount,    setPendingCount]    = useState<number | null>(pendingCountProp ?? null)
+  const [notifCount,      setNotifCount]      = useState<number>(0)
 
   useEffect(() => {
     // Si ya tenemos rol desde props (dashboard server-rendered), lo usamos directamente
@@ -71,6 +77,31 @@ export default function Sidebar({ userEmail, userName, empresa, rol: rolProp }: 
         })
     })
   }, [supabase, rolProp, empresa, userName, userEmail, email])
+
+  useEffect(() => {
+    if (!rol || pendingCountProp !== undefined || !['admin', 'auditor'].includes(rol)) return
+    supabase
+      .from('registros_datos')
+      .select('id', { count: 'exact', head: true })
+      .eq('estado', 'en_revision')
+      .then(({ count }) => {
+        if (typeof count === 'number') setPendingCount(count)
+      })
+  }, [supabase, rol, pendingCountProp])
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from('notificaciones')
+        .select('id', { count: 'exact', head: true })
+        .eq('usuario_id', user.id)
+        .eq('leida', false)
+        .then(({ count }) => {
+          if (typeof count === 'number') setNotifCount(count)
+        })
+    })
+  }, [supabase])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -125,17 +156,32 @@ export default function Sidebar({ userEmail, userName, empresa, rol: rolProp }: 
         <nav style={{ flex: 1, padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {navItems.map(item => {
             const active = pathname === item.href || pathname.startsWith(item.href + '/')
+            const badgeVal = item.badge === 'pending' ? (pendingCount ?? 0)
+                           : item.badge === 'notif'   ? notifCount
+                           : 0
             return (
               <Link key={item.href} href={item.href} className="sb-link" style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
                 borderRadius: 10, textDecoration: 'none', fontSize: 14,
+                justifyContent: 'space-between',
                 fontWeight: active ? 600 : 400,
                 color: active ? '#4ade80' : '#94a3b8',
                 background: active ? 'rgba(74,222,128,0.12)' : 'transparent',
                 transition: 'all 0.15s',
               }}>
-                <span style={{ fontSize: 16, width: 20, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
-                {item.label}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 16, width: 20, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+                  {item.label}
+                </span>
+                {badgeVal > 0 && (
+                  <span style={{
+                    background: item.badge === 'notif' ? '#d97706' : '#dc2626',
+                    color: '#fff', borderRadius: 999, padding: '2px 8px',
+                    fontSize: 11, fontWeight: 700, minWidth: 22, textAlign: 'center',
+                  }}>
+                    {badgeVal > 99 ? '99+' : badgeVal}
+                  </span>
+                )}
               </Link>
             )
           })}
@@ -187,7 +233,7 @@ export default function Sidebar({ userEmail, userName, empresa, rol: rolProp }: 
             background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
             fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
           }}>
-            <span>🚪</span> Cerrar sesión
+            <LogOutIcon size={14} /> Cerrar sesión
           </button>
         </div>
       </aside>

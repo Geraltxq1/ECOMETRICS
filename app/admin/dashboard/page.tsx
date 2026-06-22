@@ -21,8 +21,8 @@ export default async function AdminDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const role = (user?.user_metadata as { role?: string })?.role
 
-  if (!user || role !== 'admin') {
-    return redirect('/admin')
+  if (!user || role !== 'adminglobal') {
+    return redirect('/login')
   }
 
   const adminSupabase = createAdminClient(

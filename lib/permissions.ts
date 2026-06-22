@@ -26,3 +26,19 @@ export function canExport(rol: string): boolean {
 export function canAudit(rol: string): boolean {
   return ['admin', 'auditor'].includes(rol)
 }
+
+export function canReview(rol: string): boolean {
+  return ['admin', 'auditor'].includes(rol)
+}
+
+export function canPublish(rol: string): boolean {
+  return rol === 'admin'
+}
+
+export function getRolLabel(rol: string): string {
+  return ROLES[rol as Role]?.label ?? rol
+}
+
+export function getRolColor(rol: string): string {
+  return ROLES[rol as Role]?.color ?? '#64748b'
+}

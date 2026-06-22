@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabaseClient'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
+import { BuildingIcon } from '@/components/Icons'
 
 interface Empresa {
   id: string
@@ -87,6 +88,11 @@ export default function EmpresasPage() {
 
     return (
       <>
+        {error && !showForm && (
+          <div style={{ padding: '12px 16px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: 13, marginBottom: 20 }}>
+            {error}
+          </div>
+        )}
         {/* Encabezado */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
           <div>
@@ -165,7 +171,7 @@ export default function EmpresasPage() {
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           {empresas.length === 0 ? (
             <div style={{ padding: '60px 24px', textAlign: 'center', color: '#94a3b8' }}>
-              <div style={{ fontSize: 44, marginBottom: 12 }}>🏢</div>
+              <div style={{ marginBottom: 12 }}><BuildingIcon size={44} color="#cbd5e1" /></div>
               <p style={{ margin: 0, fontSize: 14 }}>No hay empresas registradas. Crea la primera.</p>
             </div>
           ) : (

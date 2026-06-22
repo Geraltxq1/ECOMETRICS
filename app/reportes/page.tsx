@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabaseClient'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import StatsCard from '@/components/StatsCard'
+import { GlobeIcon, FlameIcon, ZapIcon, LinkIcon, BarChartIcon } from '@/components/Icons'
 
 interface Registro {
   mes: number | null
@@ -35,8 +36,9 @@ export default function ReportesPage() {
 
       const [regRes, sedRes] = await Promise.all([
         supabase.from('registros_datos')
-          .select('mes, anio, sede_id, co2_calculado, indicadores(alcance)')
-          .eq('usuario_id', user.id),
+          .select('mes, anio, sede_id, co2_calculado, estado, indicadores(alcance)')
+          .eq('usuario_id', user.id)
+          .in('estado', ['aprobado', 'publicado']),
         supabase.from('sedes').select('id, nombre'),
       ])
 
@@ -74,22 +76,20 @@ export default function ReportesPage() {
   const anios = [...new Set(registros.map(r => r.anio))].sort((a, b) => b - a)
 
   const handleExport = () => {
-    const lines = [
-      'Mes,tCO2e',
-      ...porMes.map(m => `${m.label},${m.co2.toFixed(6)}`),
-      `Total,${totalCO2.toFixed(6)}`,
-      '',
-      'Sede,tCO2e',
-      ...porSede.map(s => `${s.nombre},${s.co2.toFixed(6)}`),
-    ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url; a.download = `reporte_emisiones_${anio}.csv`; a.click()
-    URL.revokeObjectURL(url)
+    window.print()
   }
 
   return (
+    <>
+    <style>{`
+      @media print {
+        body * { visibility: hidden; }
+        main, main * { visibility: visible; }
+        main { position: absolute; top: 0; left: 0; width: 100%; padding: 24px !important; }
+        button, a[href] { display: none !important; }
+        div[style*="overflowY"] { overflow: visible !important; }
+      }
+    `}</style>
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
       <Sidebar userEmail={user?.email} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -124,16 +124,16 @@ export default function ReportesPage() {
                   background: '#fff', color: '#374151', fontSize: 14, fontWeight: 600, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 6,
                 }}>
-                  ⬇ Exportar CSV
+                  ⬇ Exportar PDF
                 </button>
               </div>
 
               {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
-                <StatsCard title="Total tCO₂e"          value={totalCO2.toFixed(3)} description={`Año ${anio}`}           color="#dc2626" icon="🌍" />
-                <StatsCard title="Alcance 1 (directo)"  value={alcance1.toFixed(3)} description="Emisiones propias"        color="#b45309" icon="🔥" />
-                <StatsCard title="Alcance 2 (energía)"  value={alcance2.toFixed(3)} description="Electricidad comprada"    color="#1d4ed8" icon="⚡" />
-                <StatsCard title="Alcance 3 (cadena)"   value={alcance3.toFixed(3)} description="Emisiones indirectas"     color="#7e22ce" icon="🔗" />
+                <StatsCard title="Total tCO₂e"          value={totalCO2.toFixed(3)} description={`Año ${anio}`}           color="#dc2626" icon={<GlobeIcon  size={20} color="#dc2626" />} />
+                <StatsCard title="Alcance 1 (directo)"  value={alcance1.toFixed(3)} description="Emisiones propias"        color="#b45309" icon={<FlameIcon  size={20} color="#b45309" />} />
+                <StatsCard title="Alcance 2 (energía)"  value={alcance2.toFixed(3)} description="Electricidad comprada"    color="#1d4ed8" icon={<ZapIcon    size={20} color="#1d4ed8" />} />
+                <StatsCard title="Alcance 3 (cadena)"   value={alcance3.toFixed(3)} description="Emisiones indirectas"     color="#7e22ce" icon={<LinkIcon   size={20} color="#7e22ce" />} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 20, marginBottom: 24 }}>
@@ -145,7 +145,7 @@ export default function ReportesPage() {
                   </h3>
                   {totalCO2 === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
-                      <div style={{ fontSize: 44, marginBottom: 12 }}>📊</div>
+                      <div style={{ marginBottom: 12 }}><BarChartIcon size={44} color="#cbd5e1" /></div>
                       <p style={{ margin: 0, fontSize: 14 }}>Sin datos para {anio}. Agrega registros.</p>
                     </div>
                   ) : (
@@ -241,6 +241,7 @@ export default function ReportesPage() {
         </main>
       </div>
     </div>
+    </>
   )
 }
 

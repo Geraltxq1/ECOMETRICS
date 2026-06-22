@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabaseClient'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import RoleBadge from '@/components/RoleBadge'
+import { BuildingIcon, KeyIcon, UsersIcon, CopyIcon, CheckIcon } from '@/components/Icons'
 
 interface Perfil   { id: string; user_id: string; nombre: string | null; email: string | null; rol: string; activo: boolean }
-interface Empresa  { id: string; nombre: string; industria: string | null; ciudad: string | null; pais: string | null }
+interface Empresa  { id: string; nombre: string; industria: string | null; ciudad: string | null; pais: string | null; notificar_revision: boolean | null; notificar_rechazo: boolean | null }
 interface Codigo   { id: string; codigo: string; rol_asignado: string; usado: boolean; expira_en: string; created_at: string }
 
 const ROLES_INV = ['editor', 'viewer', 'auditor', 'admin']
@@ -27,12 +28,15 @@ export default function ConfiguracionPage() {
   const [success, setSuccess]   = useState<string | null>(null)
   const [generando, setGenerando] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const copiedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Empresa form state
   const [empNombre, setEmpNombre]     = useState('')
   const [empIndustria, setEmpIndustria] = useState('')
   const [empCiudad, setEmpCiudad]     = useState('')
   const [empPais, setEmpPais]         = useState('Colombia')
+  const [empNotificarRevision, setEmpNotificarRevision] = useState(true)
+  const [empNotificarRechazo, setEmpNotificarRechazo]  = useState(true)
   const [rolInv, setRolInv]           = useState('editor')
 
   useEffect(() => {
@@ -55,7 +59,7 @@ export default function ConfiguracionPage() {
 
       const { data: emp } = await supabase
         .from('empresas')
-        .select('id, nombre, industria, ciudad, pais')
+        .select('id, nombre, industria, ciudad, pais, notificar_revision, notificar_rechazo')
         .eq('id', p.empresa_id ?? '')
         .single()
 
@@ -65,6 +69,8 @@ export default function ConfiguracionPage() {
         setEmpIndustria(emp.industria ?? '')
         setEmpCiudad(emp.ciudad ?? '')
         setEmpPais(emp.pais ?? 'Colombia')
+        setEmpNotificarRevision(emp.notificar_revision ?? true)
+        setEmpNotificarRechazo(emp.notificar_rechazo ?? true)
       }
 
       // Cargar miembros del equipo
@@ -99,7 +105,14 @@ export default function ConfiguracionPage() {
 
     const { error } = await supabase
       .from('empresas')
-      .update({ nombre: empNombre, industria: empIndustria, ciudad: empCiudad, pais: empPais } as never)
+      .update({
+        nombre: empNombre,
+        industria: empIndustria,
+        ciudad: empCiudad,
+        pais: empPais,
+        notificar_revision: empNotificarRevision,
+        notificar_rechazo: empNotificarRechazo,
+      } as never)
       .eq('id', empresa.id)
 
     if (error) setError(error.message)
@@ -113,48 +126,48 @@ export default function ConfiguracionPage() {
   const generarCodigo = async () => {
     if (!empresa) return
     setGenerando(true); setError(null)
-    const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    const rand = Array.from({ length: 4 }, () => letters[Math.floor(Math.random() * letters.length)]).join('')
-    const codigo = `ECO-${new Date().getFullYear()}-${rand}`
 
-    const { data, error } = await supabase
-      .from('codigos_invitacion')
-      .insert({
-        empresa_id:   empresa.id,
-        codigo,
-        creado_por:   user?.id,
-        rol_asignado: rolInv,
-      } as never)
-      .select()
-      .single()
+    const res = await fetch('/api/empresa/generar-codigo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rolInv }),
+    })
+    const result = await res.json()
 
-    if (error) setError(error.message)
-    else setCodigos(prev => [data as Codigo, ...prev])
+    if (!res.ok) setError(result.error ?? 'Error al generar el código.')
+    else setCodigos(prev => [result.data as Codigo, ...prev])
     setGenerando(false)
   }
 
   const copiarCodigo = (codigo: string) => {
     navigator.clipboard.writeText(codigo)
     setCopiedCode(codigo)
-    setTimeout(() => setCopiedCode(null), 2000)
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+    copiedTimerRef.current = setTimeout(() => setCopiedCode(null), 2000)
   }
 
   const cambiarRol = async (perfilId: string, nuevoRol: string) => {
+    const miembro = miembros.find(m => m.id === perfilId)
+    if (!miembro || miembro.user_id === user?.id) return
     const { error } = await supabase
       .from('perfiles')
       .update({ rol: nuevoRol } as never)
       .eq('id', perfilId)
 
-    if (!error) setMiembros(prev => prev.map(m => m.id === perfilId ? { ...m, rol: nuevoRol } : m))
+    if (error) setError('Error al cambiar rol: ' + error.message)
+    else setMiembros(prev => prev.map(m => m.id === perfilId ? { ...m, rol: nuevoRol } : m))
   }
 
   const toggleActivo = async (perfilId: string, activo: boolean) => {
+    const miembro = miembros.find(m => m.id === perfilId)
+    if (!miembro || miembro.user_id === user?.id) return
     const { error } = await supabase
       .from('perfiles')
       .update({ activo: !activo } as never)
       .eq('id', perfilId)
 
-    if (!error) setMiembros(prev => prev.map(m => m.id === perfilId ? { ...m, activo: !activo } : m))
+    if (error) setError('Error al cambiar estado: ' + error.message)
+    else setMiembros(prev => prev.map(m => m.id === perfilId ? { ...m, activo: !activo } : m))
   }
 
   if (loading) {
@@ -186,7 +199,7 @@ export default function ConfiguracionPage() {
             {success && <div style={sucBox}>{success}</div>}
 
             {/* ── Sección 1: Datos empresa ── */}
-            <Section title="Datos de la empresa" icon="🏢">
+            <Section title="Datos de la empresa" icon={<BuildingIcon size={16} />}>
               <form onSubmit={saveEmpresa} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={lbl}>Nombre de la empresa *</label>
@@ -207,6 +220,19 @@ export default function ConfiguracionPage() {
                   <label style={lbl}>País</label>
                   <input style={inp} value={empPais} onChange={e => setEmpPais(e.target.value)} placeholder="Colombia" />
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, gridColumn: '1 / -1' }}>
+                  <label style={{ ...lbl, marginBottom: 4 }}>Notificaciones</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <input type="checkbox" checked={empNotificarRevision} onChange={e => setEmpNotificarRevision(e.target.checked)} />
+                      <span style={{ fontSize: 13, color: '#374151' }}>Notificar por nuevos registros en revisión</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <input type="checkbox" checked={empNotificarRechazo} onChange={e => setEmpNotificarRechazo(e.target.checked)} />
+                      <span style={{ fontSize: 13, color: '#374151' }}>Notificar cuando un registro es rechazado</span>
+                    </label>
+                  </div>
+                </div>
                 <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
                   <button type="submit" disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
                     {saving ? 'Guardando…' : 'Guardar cambios'}
@@ -216,7 +242,7 @@ export default function ConfiguracionPage() {
             </Section>
 
             {/* ── Sección 2: Código de invitación ── */}
-            <Section title="Código de invitación" icon="🔑">
+            <Section title="Código de invitación" icon={<KeyIcon size={16} />}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
                 <div>
                   <label style={lbl}>Rol a asignar</label>
@@ -260,7 +286,9 @@ export default function ConfiguracionPage() {
                         </div>
                         {!c.usado && !expirado && (
                           <button onClick={() => copiarCodigo(c.codigo)} style={btnSecondary}>
-                            {copiedCode === c.codigo ? '✓ Copiado' : '📋 Copiar'}
+                            {copiedCode === c.codigo
+                              ? <><CheckIcon size={12} /> Copiado</>
+                              : <><CopyIcon  size={12} /> Copiar</>}
                           </button>
                         )}
                       </div>
@@ -271,7 +299,7 @@ export default function ConfiguracionPage() {
             </Section>
 
             {/* ── Sección 3: Equipo ── */}
-            <Section title={`Equipo · ${miembros.length} miembros`} icon="👥">
+            <Section title={`Equipo · ${miembros.length} miembros`} icon={<UsersIcon size={16} />}>
               {miembros.length === 0 ? (
                 <p style={{ color: '#94a3b8', fontSize: 13 }}>No hay miembros aún. Comparte un código de invitación.</p>
               ) : (
@@ -341,11 +369,11 @@ export default function ConfiguracionPage() {
   )
 }
 
-function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '24px 28px', marginBottom: 20 }}>
       <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span>{icon}</span>{title}
+        <span style={{ color: '#64748b', display: 'flex' }}>{icon}</span>{title}
       </h3>
       {children}
     </div>
