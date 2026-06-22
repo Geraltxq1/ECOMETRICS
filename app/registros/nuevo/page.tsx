@@ -137,7 +137,7 @@ export default function NuevoRegistroPage() {
         .upload(path, archivo, { contentType: archivo.type })
 
       if (uploadError) {
-        setError('Registro guardado, pero falló la carga del archivo: ' + uploadError.message)
+        setError('Registro guardado Correctamente, pero falló la carga del archivo : ' + uploadError.message)
         setSaving(false); return
       }
       if (uploadData) {
