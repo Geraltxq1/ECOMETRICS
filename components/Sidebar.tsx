@@ -56,6 +56,15 @@ export default function Sidebar({ userEmail, userName, empresa, rol: rolProp, pe
       if (!email) setEmail(user.email ?? '')
 
       supabase
+        .from('notificaciones')
+        .select('id', { count: 'exact', head: true })
+        .eq('usuario_id', user.id)
+        .eq('leida', false)
+        .then(({ count }) => {
+          if (typeof count === 'number') setNotifCount(count)
+        })
+
+      supabase
         .from('perfiles')
         .select('rol, nombre, empresa_id, empresas(nombre)')
         .eq('user_id', user.id)
@@ -90,6 +99,9 @@ export default function Sidebar({ userEmail, userName, empresa, rol: rolProp, pe
   }, [supabase, rol, pendingCountProp])
 
   useEffect(() => {
+    // En las páginas con props del servidor no se consulta el perfil arriba;
+    // este es el único getUser necesario para obtener el contador.
+    if (!rolProp) return
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase
@@ -101,7 +113,7 @@ export default function Sidebar({ userEmail, userName, empresa, rol: rolProp, pe
           if (typeof count === 'number') setNotifCount(count)
         })
     })
-  }, [supabase])
+  }, [supabase, rolProp])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()

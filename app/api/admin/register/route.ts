@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { validateAdminRegister } from '@/lib/validation'
 
 export async function POST(request: Request) {
-  const body = await request.json()
-  const { email, password, code } = body as {
-    email?: string
-    password?: string
-    code?: string
+  // [14] Validar y [15] sanitizar input
+  let body: unknown
+  try { body = await request.json() } catch {
+    return NextResponse.json({ error: 'Body inválido.' }, { status: 400 })
   }
 
-  if (!email || !password || !code) {
-    return NextResponse.json({ error: 'Faltan campos requeridos.' }, { status: 400 })
+  const validation = validateAdminRegister(body)
+  if (validation.error || !validation.data) {
+    return NextResponse.json({ error: validation.error ?? 'Datos inválidos.' }, { status: 400 })
   }
 
-  if (code !== process.env.ADMIN_INVITE_CODE) {
+  const { email, password, code } = validation.data
+
+  // [13] Comparación segura del código
+  const expectedCode = process.env.ADMIN_INVITE_CODE ?? ''
+  if (code.length !== expectedCode.length || code !== expectedCode) {
     return NextResponse.json({ error: 'Código de administrador incorrecto.' }, { status: 403 })
   }
 
@@ -25,49 +30,27 @@ export async function POST(request: Request) {
   const { data, error } = await adminSupabase.auth.signUp({
     email,
     password,
-    options: {
-      data: {
-        role: 'adminglobal',
-      },
-    },
+    options: { data: { role: 'adminglobal' } },
   })
 
-  // Si el usuario ya existe, actualizar su rol a admin en vez de fallar
   if (error?.message?.toLowerCase().includes('already registered') || error?.message?.toLowerCase().includes('already been registered')) {
     const { data: listData, error: listError } = await adminSupabase.auth.admin.listUsers()
-    if (listError) {
-      return NextResponse.json({ error: 'Error al buscar el usuario.' }, { status: 500 })
-    }
-
+    if (listError) return NextResponse.json({ error: 'Error al buscar el usuario.' }, { status: 500 })
     const existing = listData.users.find(u => u.email === email)
-    if (!existing) {
-      return NextResponse.json({ error: 'Usuario no encontrado.' }, { status: 404 })
-    }
-
+    if (!existing) return NextResponse.json({ error: 'Usuario no encontrado.' }, { status: 404 })
     const { error: updateError } = await adminSupabase.auth.admin.updateUserById(existing.id, {
       user_metadata: { ...existing.user_metadata, role: 'adminglobal' },
       email_confirm: true,
     })
-
-    if (updateError) {
-      return NextResponse.json({ error: 'Error al actualizar permisos: ' + updateError.message }, { status: 500 })
-    }
-
+    if (updateError) return NextResponse.json({ error: 'Error al actualizar permisos: ' + updateError.message }, { status: 500 })
     return NextResponse.json({ message: 'Permisos de administrador asignados. Ya puedes iniciar sesión.' })
   }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-  // Confirmar automáticamente la cuenta nueva
   if (data.user) {
-    const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(data.user.id, {
-      email_confirm: true,
-    })
-    if (confirmError) {
-      console.error('Error confirming user:', confirmError)
-    }
+    const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(data.user.id, { email_confirm: true })
+    if (confirmError) console.error('Error confirming user:', confirmError)
   }
 
   return NextResponse.json({ message: 'Admin registrado exitosamente. Ya puedes iniciar sesión.', data })

@@ -64,7 +64,7 @@ export default function IndicadoresPage() {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
       <Sidebar userEmail={user?.email} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Header title="Indicadores GRI" email={user?.email}
+        <Header title="Información Indicadores GRI" email={user?.email}
           breadcrumb={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Indicadores GRI' }]} />
         <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
 
@@ -79,6 +79,9 @@ export default function IndicadoresPage() {
                 </p>
               </div>
 
+              <BannerInfo tipo="info">
+                Escoge el Indicador acorde a la creacion de Tu Registro
+              </BannerInfo>
               <BannerInfo tipo="info">
                 Mostrando 12 de 400+ indicadores GRI disponibles. ECØMETRICS prioriza los indicadores de
                 mayor impacto para pymes en fase inicial de gestión de sostenibilidad. El catálogo está

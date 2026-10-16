@@ -1,4 +1,4 @@
-import { ROLES, type Role } from '@/lib/permissions'
+import { getRolLabel, getRolColor } from '@/lib/permissions'
 
 interface RoleBadgeProps {
   rol: string
@@ -6,7 +6,8 @@ interface RoleBadgeProps {
 }
 
 export default function RoleBadge({ rol, size = 'md' }: RoleBadgeProps) {
-  const config = ROLES[rol as Role] ?? { label: rol, color: '#64748b', bg: '#f8fafc' }
+  const label = getRolLabel(rol)
+  const color = getRolColor(rol)
   const pad = size === 'sm' ? '2px 7px' : '3px 10px'
   const fs  = size === 'sm' ? 10 : 11
 
@@ -17,13 +18,13 @@ export default function RoleBadge({ rol, size = 'md' }: RoleBadgeProps) {
       borderRadius: 6,
       fontSize: fs,
       fontWeight: 700,
-      color: config.color,
-      background: config.bg,
-      border: `1px solid ${config.color}33`,
+      color,
+      background: `${color}1A`,
+      border: `1px solid ${color}33`,
       letterSpacing: '0.3px',
       textTransform: 'uppercase',
     }}>
-      {config.label}
+      {label}
     </span>
   )
 }

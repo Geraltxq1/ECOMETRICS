@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { createClient } from '@/lib/supabaseClient'
 import EstadoBadge from '@/components/EstadoBadge'
-import { canAudit } from '@/lib/permissions'
+import { canReview } from '@/lib/permissions'
 import { SearchIcon } from '@/components/Icons'
 import { registrarAuditoria, registrarComentarioRevision } from '@/lib/auditoria'
 import ModalRevision from '@/components/ModalRevision'
@@ -53,7 +53,7 @@ export default function RevisionPage() {
 
       const rolActual = perfil?.rol ?? 'viewer'
       setRol(rolActual)
-      if (!canAudit(rolActual)) { window.location.href = '/dashboard'; return }
+      if (!canReview(rolActual)) { window.location.href = '/dashboard'; return }
 
       const { data: registrosData } = await supabase
         .from('registros_datos')

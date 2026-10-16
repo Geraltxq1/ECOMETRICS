@@ -23,7 +23,8 @@ export default function CalculoTransparente({
 
       {factorEmision == null ? (
         <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
-          Este indicador no genera cálculo de CO₂.
+          Este indicador registra {unidad} sin conversión a CO₂.
+          El dato contribuye al reporte GRI pero no suma al total de emisiones.
         </p>
       ) : (
         <>

@@ -255,7 +255,11 @@ export default function NuevoRegistroPage() {
                           </div>
                           <div>
                             <label style={lbl}>Factor de emisión</label>
-                            <div style={readOnly}>{selectedIndicador.factor_emision ?? 'No definido'}</div>
+                            <div style={readOnly}>
+                              {selectedIndicador.factor_emision != null
+                                ? selectedIndicador.factor_emision
+                                : 'No aplica — este indicador no genera cálculo de CO₂'}
+                            </div>
                           </div>
                           <div>
                             <label style={lbl}>Alcance</label>

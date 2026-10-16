@@ -7,7 +7,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import EstadoBadge from '@/components/EstadoBadge'
 import { createClient } from '@/lib/supabaseClient'
-import { canAudit, canPublish as canPublishRole } from '@/lib/permissions'
+import { canReview as canReviewRole, canPublish as canPublishRole } from '@/lib/permissions'
 import { FileIcon } from '@/components/Icons'
 import { registrarAuditoria, registrarComentarioRevision } from '@/lib/auditoria'
 import CalculoTransparente from '@/components/CalculoTransparente'
@@ -54,6 +54,7 @@ export default function RegistroDetallePage() {
   const [modalAccion, setModalAccion] = useState<'aprobado' | 'rechazado' | null>(null)
   const [rol, setRol] = useState<string>('viewer')
   const [eventos, setEventos] = useState<EventoTimeline[]>([])
+  const [revisorNombre, setRevisorNombre] = useState<string | null>(null)
 
   async function cargarTimeline(registroData: RegistroDetalle, logs: LogAuditoria[], comentarios: ComentarioRev[]) {
     const tieneCreado = logs.some(l => l.accion === 'creado')
@@ -140,6 +141,15 @@ export default function RegistroDetallePage() {
             evidencias: evidenciasRes.data ?? [],
           })
 
+          if (registroData.revisado_por) {
+            const { data: revisorData } = await supabase
+              .from('perfiles')
+              .select('nombre, email')
+              .eq('user_id', registroData.revisado_por)
+              .single()
+            setRevisorNombre(revisorData?.nombre ?? revisorData?.email ?? 'Usuario desconocido')
+          }
+
           await cargarTimeline(registroData, logsRes.data ?? [], comentariosRes.data ?? [])
         }
       } catch (caught) {
@@ -170,6 +180,7 @@ export default function RegistroDetallePage() {
     const { error } = await supabase.from('registros_datos').update({ estado: nuevoEstado, revisado_por: userId, revisado_en: new Date().toISOString(), publicado_en: nuevoEstado === 'publicado' ? new Date().toISOString() : registro.publicado_en } as never).eq('id', registro.id)
     if (!error) {
       setRegistro({ ...registro, estado: nuevoEstado, revisado_por: userId ?? null, revisado_en: new Date().toISOString(), publicado_en: nuevoEstado === 'publicado' ? new Date().toISOString() : registro.publicado_en })
+      if (userId) setRevisorNombre(user?.email ?? 'Tú')
 
       await registrarAuditoria({
         empresaId: registro.empresa_id ?? null, usuarioId: userId ?? null, accion: nuevoEstado,
@@ -222,13 +233,14 @@ export default function RegistroDetallePage() {
         await insertNotificacion(registro.usuario_id, 'rechazado', `Tu registro fue rechazado: ${comentario}`)
       }
       setRegistro({ ...registro, estado: 'rechazado', revisado_por: userId ?? null, revisado_en: new Date().toISOString() })
+      if (userId) setRevisorNombre(user?.email ?? 'Tú')
       setModalAccion(null)
     }
     setActionLoading(false)
   }
 
   const canEdit = registro?.estado === 'borrador'
-  const canReview = registro?.estado === 'en_revision' && canAudit(rol)
+  const canReview = registro?.estado === 'en_revision' && canReviewRole(rol)
   const canPublish = registro?.estado === 'aprobado' && canPublishRole(rol)
 
   return (
@@ -269,7 +281,7 @@ export default function RegistroDetallePage() {
                   <InfoBlock label="Valor" value={`${registro.valor.toLocaleString('es-CO')} ${registro.indicadores?.unidad ?? ''}`} />
                   <InfoBlock label="CO₂ calculado" value={registro.co2_calculado != null ? `${registro.co2_calculado.toFixed(4)} tCO₂e` : '—'} />
                   <InfoBlock label="Período" value={registro.mes ? `${MESES[registro.mes]} ${registro.anio}` : String(registro.anio)} />
-                  <InfoBlock label="Revisado por" value={registro.revisado_por ?? '—'} />
+                  <InfoBlock label="Revisado por" value={registro.revisado_por ? (revisorNombre ?? 'Usuario desconocido') : '—'} />
                   <InfoBlock label="Revisado en" value={registro.revisado_en ? new Date(registro.revisado_en).toLocaleString('es-CO') : '—'} />
                   <InfoBlock label="Publicado en" value={registro.publicado_en ? new Date(registro.publicado_en).toLocaleString('es-CO') : '—'} />
                 </div>

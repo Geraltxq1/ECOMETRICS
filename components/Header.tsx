@@ -44,6 +44,7 @@ function tiempoRelativo(fecha: string): string {
 export default function Header({ title, email, empresa, breadcrumb }: HeaderProps) {
   const supabase   = useMemo(() => createClient(), [])
   const [notis, setNotis]       = useState<Notificacion[]>([])
+  const [userId, setUserId]     = useState<string | null>(null)
   const [showDrop, setShowDrop] = useState(false)
   const [marking, setMarking]   = useState(false)
   const dropRef = useRef<HTMLDivElement>(null)
@@ -51,9 +52,11 @@ export default function Header({ title, email, empresa, breadcrumb }: HeaderProp
   const unread = notis.filter(n => !n.leida).length
 
   useEffect(() => {
+    if (!showDrop) return
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      setUserId(user.id)
       const { data } = await supabase
         .from('notificaciones')
         .select('id, tipo, mensaje, leida, created_at, registro_id')
@@ -63,7 +66,7 @@ export default function Header({ title, email, empresa, breadcrumb }: HeaderProp
       setNotis((data ?? []) as Notificacion[])
     }
     load()
-  }, [supabase])
+  }, [supabase, showDrop])
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -75,10 +78,9 @@ export default function Header({ title, email, empresa, breadcrumb }: HeaderProp
 
   const markAllRead = async () => {
     setMarking(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
+    if (userId) {
       await supabase.from('notificaciones').update({ leida: true } as never)
-        .eq('usuario_id', user.id).eq('leida', false)
+        .eq('usuario_id', userId).eq('leida', false)
       setNotis(prev => prev.map(n => ({ ...n, leida: true })))
     }
     setMarking(false)

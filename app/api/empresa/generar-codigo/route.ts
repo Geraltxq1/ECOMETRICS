@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomInt } from 'crypto'
 
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const ROLES_INVITABLES = ['editor', 'viewer', 'auditor']
 
 function generarCodigo(): string {
   const rand = Array.from({ length: 4 }, () => CHARS[randomInt(0, CHARS.length)]).join('')
@@ -30,9 +31,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No autenticado.' }, { status: 401 })
   }
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const { rolInv } = body as { rolInv?: string }
   const rol = rolInv ?? 'editor'
+
+  if (!ROLES_INVITABLES.includes(rol)) {
+    return NextResponse.json({ error: 'No se puede invitar directamente con ese rol.' }, { status: 400 })
+  }
 
   const admin = createAdminClient()
 
