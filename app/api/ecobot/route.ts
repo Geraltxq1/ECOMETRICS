@@ -1,19 +1,5 @@
 import { NextResponse } from 'next/server'
 
-interface GeminiContentBlock {
-  type?: string
-  text?: string
-}
-
-interface GeminiStep {
-  type?: string
-  content?: GeminiContentBlock[]
-}
-
-interface GeminiResponse {
-  steps?: GeminiStep[]
-}
-
 const SYSTEM_PROMPT = `Eres EcoBot, el asistente de sostenibilidad de ECOMETRICS para empresas colombianas.
 
 REGLAS OBLIGATORIAS:
@@ -28,7 +14,6 @@ const PREGUNTA_PERMITIDA = /sostenib|ambient|emisi|carbono|co2|co₂|huella|\bgr
 const SALUDO = /^(hola|buenas|buenos d[ií]as|buenas tardes|buenas noches|gracias|qu[eé] puedes hacer|ayuda)[!¡?. ]*$/i
 
 const RESPUESTA_FUERA_DE_ALCANCE = 'Solo puedo ayudarte con sostenibilidad, indicadores GRI, emisiones, consumo energético y el trabajo ambiental en ECOMETRICS.'
-
 const RESPUESTA_SALUDO = 'Hola, soy EcoBot. Puedo ayudarte con indicadores GRI, emisiones, consumo energético y reportes de sostenibilidad en ECOMETRICS.'
 
 function limitarPalabras(text: string, maximo = 70) {
@@ -54,6 +39,7 @@ export async function POST(request: Request) {
   }
 
   const question = message.trim()
+
   if (SALUDO.test(question)) {
     return NextResponse.json({ answer: RESPUESTA_SALUDO })
   }
@@ -62,40 +48,54 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        model: 'gemini-3.6-flash',
-        store: false,
-        input: `${SYSTEM_PROMPT}\n\nPregunta del usuario: ${question}`,
-      }),
-    })
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: SYSTEM_PROMPT }],
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: question }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 256,
+          },
+        }),
+      }
+    )
 
     if (!response.ok) {
-      console.error('EcoBot: Gemini respondió con', response.status)
-      return NextResponse.json({ error: 'EcoBot no pudo responder en este momento. Inténtalo de nuevo.' }, { status: 502 })
+      const err = await response.text()
+      console.error('EcoBot Gemini error:', response.status, err)
+      return NextResponse.json(
+        { error: 'EcoBot no pudo responder en este momento. Inténtalo de nuevo.' },
+        { status: 502 }
+      )
     }
 
-    const data = await response.json() as GeminiResponse
-    const answer = data.steps
-      ?.filter((step) => step.type === 'model_output')
-      .flatMap((step) => step.content ?? [])
-      .filter((content) => content.type === 'text')
-      .map((content) => content.text ?? '')
-      .join('\n')
-      .trim()
+    const data = await response.json()
+    const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
 
     if (!answer) {
-      return NextResponse.json({ error: 'EcoBot no generó una respuesta. Inténtalo de nuevo.' }, { status: 502 })
+      return NextResponse.json(
+        { error: 'EcoBot no generó una respuesta. Inténtalo de nuevo.' },
+        { status: 502 }
+      )
     }
 
     return NextResponse.json({ answer: limitarPalabras(answer) })
   } catch (error) {
     console.error('EcoBot: no fue posible conectar con Gemini', error)
-    return NextResponse.json({ error: 'No fue posible conectar con EcoBot. Inténtalo de nuevo.' }, { status: 502 })
+    return NextResponse.json(
+      { error: 'No fue posible conectar con EcoBot. Inténtalo de nuevo.' },
+      { status: 502 }
+    )
   }
 }
